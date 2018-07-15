@@ -19,7 +19,7 @@ thread_local! {
 }
 
 pub fn mount(div_id: &str, component: Box<Component>) {
-  let app_state: AppState = AppState {
+  let mut app_state: AppState = AppState {
     top_level_component: component,
   };
 
@@ -49,8 +49,8 @@ impl Interface {
     APP_STATE.with(|rc| {
       let mut app_state = rc.replace(None).expect("app_state is missing");
 
-      let mut token = app_state.top_level_component.render();
-      let mut matched_token = match_token(&token, &path);
+      let token = app_state.top_level_component.render();
+      let matched_token = match_token(&token, &path);
 
       if let Some(HtmlToken::DomElement(d)) = matched_token {
         d.event_handlers.get(&event_name).map(|handler| {
