@@ -9,29 +9,23 @@ use jsx_types::*;
 use std::cell::RefCell;
 
 pub mod js_fns;
-mod app_state;
-use self::app_state::*;
 
 extern crate serde_json;
 
 thread_local! {
-  static APP_STATE: RefCell<Option<AppState>> = RefCell::new(None);
+  static ROOT_COMPONENT: RefCell<Option<Box<Component>>> = RefCell::new(None);
 }
 
-pub fn mount(div_id: &str, component: Box<Component>) {
-  let mut app_state: AppState = AppState {
-    top_level_component: component,
-  };
-
+pub fn mount(div_id: &str, mut component: Box<dyn Component + 'static>) {
   js_fns::initialize(div_id, Interface {});
 
-  APP_STATE.with(|rc| {
-    let token = app_state.top_level_component.render();
+  ROOT_COMPONENT.with(|rc| {
+    let token = component.render();
 
     js_fns::render(&token.as_inner_html());
     js_fns::log(&token.as_inner_html());
 
-    *rc.borrow_mut() = Some(app_state);
+    *rc.borrow_mut() = Some(component);
   });
 }
 
@@ -46,20 +40,20 @@ impl Interface {
 
     let event_name: EventName = e.parse().unwrap();
 
-    APP_STATE.with(|rc| {
-      let mut app_state = rc.replace(None).expect("app_state is missing");
+    ROOT_COMPONENT.with(|rc| {
+      let mut root_component = rc.replace(None).expect("app_state is missing");
 
-      let token = app_state.top_level_component.render();
+      let token = root_component.render();
       let matched_token = match_token(&token, &path);
 
       if let Some(HtmlToken::DomElement(d)) = matched_token {
-        d.event_handlers.get(&event_name).map(|handler| {
+        d.event_handlers.get(&event_name).map(|_handler| {
           js_fns::log("found handler");
           // handler(Event {});
         });
       }
 
-      rc.replace(Some(app_state));
+      rc.replace(Some(root_component));
     });
   }
 }
