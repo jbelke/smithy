@@ -43,13 +43,14 @@ impl Interface {
     ROOT_COMPONENT.with(|rc| {
       let mut root_component = rc.replace(None).expect("app_state is missing");
 
-      let token = root_component.render();
-      let matched_token = match_token(&token, &path);
+      let mut token = root_component.render();
+      let matched_token = match_token(&mut token, &path);
 
-      if let Some(HtmlToken::DomElement(d)) = matched_token {
-        d.event_handlers.get(&event_name).map(|_handler| {
+      if let Some(HtmlToken::DomElement(ref mut d)) = matched_token {
+        d.event_handlers.remove(&event_name).map(|handler| {
+          // handler: &std::boxed::Box<dyn std::ops::FnBox(jsx_types::Event)>
           js_fns::log("found handler");
-          // handler(Event {});
+          handler(Event {});
         });
       }
 
@@ -58,23 +59,32 @@ impl Interface {
   }
 }
 
-fn match_token<'a>(html_token: &'a HtmlToken, path: &[usize]) -> Option<&'a HtmlToken> {
+fn match_token<'a>(html_token: &'a mut HtmlToken, path: &[usize]) -> Option<&'a mut HtmlToken> {
   match path.split_first() {
-    None => Some(&html_token),
+    None => Some(html_token),
     Some((child_index, rest)) => {
       match html_token {
         HtmlToken::DomElement(d) => {
-          d.children
-            .iter()
-            .filter(|token| {
-              match token {
-                HtmlToken::DomElement(_) => true,
-                _ => false
-              }
-            })
-            .collect::<Vec<&HtmlToken>>()
-            .get(*child_index)
-            .and_then(|child_token| match_token(child_token, rest))
+          // TODO figure out why the fuck filtering is not working!!!! WAAH
+          match d.children.get_mut(*child_index) {
+            Some(child) => match_token(child, rest),
+            None => None,
+          }
+          // d.children
+            // .get(*child_index)
+            // .and_then(|mut child_token| match_token(&mut child_token, rest))
+            // .iter()
+            // .filter(|token| {
+            //   match token {
+            //     HtmlToken::DomElement(_) => true,
+            //     _ => false
+            //   }
+            // })
+            // .collect::<Vec<&HtmlToken>>()
+            // .remove(*child_index);
+
+          // match_token(&mut child, rest)
+            // .and_then(|child_token| match_token(&mut child_token, rest))
         },
         _ => None,
       }
