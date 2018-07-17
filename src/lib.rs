@@ -12,12 +12,12 @@ pub mod js_fns;
 
 extern crate serde_json;
 
-// thread_local! {
-//   static ROOT_COMPONENT: RefCell<Option<Box<Component<'static>>>> = RefCell::new(None);
-// }
+thread_local! {
+  static ROOT_COMPONENT: RefCell<Option<Box<Component<'static>>>> = RefCell::new(None);
+}
 
 pub fn mount(div_id: &str, mut component: Box<dyn Component>) {
-  // js_fns::initialize(div_id, Interface {}, component);
+  js_fns::initialize(div_id, Interface {});
 
   //   let token = component.render();
 
