@@ -16,16 +16,23 @@ thread_local! {
   static ROOT_COMPONENT: RefCell<Option<Box<Component<'static>>>> = RefCell::new(None);
 }
 
-pub fn mount(div_id: &str, mut component: Box<dyn Component>) {
+pub fn mount(div_id: &str, component: Box<dyn for<'a> Component<'a>>) {
   js_fns::initialize(div_id, Interface {});
 
-  //   let token = component.render();
+  let mut component = unsafe {
+    let component_static: Box<dyn Component<'static>> = std::mem::transmute(component);
+    component_static
+  };
+  ROOT_COMPONENT.with(|rc| {
+    *rc.borrow_mut() = Some(component);
+  });
+}
 
-  //   js_fns::render(&token.as_inner_html());
-  //   js_fns::log(&token.as_inner_html());
 
-  //   *rc.borrow_mut() = Some(component);
-  // });
+
+fn get_inner_html_from_component(mut component: Box<dyn for<'a> Component<'a>>) -> (String, Box<dyn for<'a> Component<'a>>) {
+  let inner_html = component.render().as_inner_html();
+  (inner_html, component)
 }
 
 #[wasm_bindgen]
@@ -33,6 +40,20 @@ pub struct Interface {}
 
 #[wasm_bindgen]
 impl Interface {
+  pub fn get_inner_html(&self) -> String {
+    let mut inner_html: String = "".to_string();
+    ROOT_COMPONENT.with(|rc| {
+      let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
+      let component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+        std::mem::transmute(component)
+      };
+      let (inner, component) = get_inner_html_from_component(component);
+      inner_html = inner;
+      rc.replace(Some(component));
+    });
+    inner_html
+  }
+
   pub fn handle_event(&self, e: &str, path: &str) {
     let path: Vec<usize> = serde_json::from_str(path).unwrap();
     js_fns::log(e);

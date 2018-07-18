@@ -16,6 +16,7 @@ extern {
   #[wasm_bindgen(module = "./lib")]
   pub fn initialize(id: &str, interface: Interface);
 
-  #[wasm_bindgen(module = "./lib")]
-  pub fn render(inner_html: &str);
+  // N.B. this should not be needed to be called
+  // #[wasm_bindgen(module = "./lib")]
+  // pub fn render(inner_html: &str);
 }
