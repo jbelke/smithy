@@ -35,6 +35,11 @@ fn get_inner_html_from_component(mut component: Box<dyn for<'a> Component<'a>>) 
   (inner_html, component)
 }
 
+// fn get_token_from_component<'b>(mut component: Box<dyn for<'a> Component<'a>>) -> (HtmlToken<'b>, Box<dyn for<'a> Component<'a>>) {
+//   let token = component.render();
+//   (token, component)
+// }
+
 #[wasm_bindgen]
 pub struct Interface {}
 
@@ -61,9 +66,12 @@ impl Interface {
     let event_name: EventName = e.parse().unwrap();
 
     // ROOT_COMPONENT.with(|rc| {
-    //   let mut root_component = rc.replace(None).expect("ROOT_COMPONENT is missing");
+    //   let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
+    //   let component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+    //     std::mem::transmute(component)
+    //   };
 
-    //   let mut token = root_component.render();
+    //   let (mut token, component) = get_token_from_component(component);
     //   let matched_token = match_token(&mut token, &path);
 
     //   if let Some(HtmlToken::DomElement(ref mut d)) = matched_token {
@@ -74,7 +82,7 @@ impl Interface {
     //     });
     //   }
 
-    //   rc.replace(Some(root_component));
+    //   rc.replace(Some(component));
     // });
   }
 }
