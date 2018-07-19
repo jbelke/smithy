@@ -35,10 +35,19 @@ fn get_inner_html_from_component(mut component: Box<dyn for<'a> Component<'a>>) 
   (inner_html, component)
 }
 
-// fn get_token_from_component<'b>(mut component: Box<dyn for<'a> Component<'a>>) -> (HtmlToken<'b>, Box<dyn for<'a> Component<'a>>) {
-//   let token = component.render();
-//   (token, component)
-// }
+fn mutate_component<'b>(mut component: Box<dyn for<'a> Component<'a>>, event_name: EventName) -> Box<dyn for<'a> Component<'a>> {
+  {
+    let mut token = component.render();
+    // let event: EventName = EventName::OnClick;
+    if let HtmlToken::DomElement(ref mut d) = token {
+      if let Some(handler) = d.event_handlers.get_mut(&event_name) {
+        handler(Event {});
+      }
+    }
+  }
+  component
+}
+// Handle click in function and return component back
 
 #[wasm_bindgen]
 pub struct Interface {}
@@ -65,25 +74,14 @@ impl Interface {
 
     let event_name: EventName = e.parse().unwrap();
 
-    // ROOT_COMPONENT.with(|rc| {
-    //   let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
-    //   let component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
-    //     std::mem::transmute(component)
-    //   };
-
-    //   let (mut token, component) = get_token_from_component(component);
-    //   let matched_token = match_token(&mut token, &path);
-
-    //   if let Some(HtmlToken::DomElement(ref mut d)) = matched_token {
-    //     d.event_handlers.get_mut(&event_name).map(|handler| {
-    //       // handler: &std::boxed::Box<dyn std::ops::FnBox(jsx_types::Event)>
-    //       js_fns::log("found handler");
-    //       handler(Event {});
-    //     });
-    //   }
-
-    //   rc.replace(Some(component));
-    // });
+    ROOT_COMPONENT.with(|rc| {
+      let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
+      let component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+        std::mem::transmute(component)
+      };
+      let component = mutate_component(component, event_name);
+      rc.replace(Some(component));
+    });
   }
 }
 
