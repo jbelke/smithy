@@ -3,8 +3,6 @@ use wasm_bindgen::prelude::*;
 
 use super::Interface;
 
-use jsx_types::*;
-
 #[wasm_bindgen]
 extern {
   #[wasm_bindgen]
