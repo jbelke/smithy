@@ -14,6 +14,7 @@ extern crate serde_json;
 
 thread_local! {
   static ROOT_COMPONENT: RefCell<Option<Box<Component<'static>>>> = RefCell::new(None);
+  static LAST_RENDERED_TOKEN: RefCell<Option<jsx_types::bare::BareHtmlToken>> = RefCell::new(None);
 }
 
 pub fn mount(div_id: &str, component: Box<dyn for<'a> Component<'a>>) {
@@ -28,24 +29,35 @@ pub fn mount(div_id: &str, component: Box<dyn for<'a> Component<'a>>) {
   });
 }
 
-fn get_inner_html_from_component(mut component: Box<dyn for<'a> Component<'a>>) -> (String, Box<dyn for<'a> Component<'a>>) {
-  let inner_html = component.render().as_inner_html();
-  (inner_html, component)
-}
-
 #[wasm_bindgen]
 pub struct Interface {}
 
 #[wasm_bindgen]
 impl Interface {
+  pub fn get_diff(&self) -> String {
+    let foo: jsx_types::diff::Diff = vec![(
+      vec![],
+      jsx_types::diff::DiffOperation::Replace(
+        jsx_types::diff::ReplaceOperation {
+          new_inner_html: self.get_inner_html(),
+        }
+      )
+    )];
+    serde_json::to_string(&foo).unwrap()
+  }
+
+
   pub fn get_inner_html(&self) -> String {
     let mut inner_html: String = "".to_string();
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
-      let component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
         std::mem::transmute(component)
       };
-      let (inner, component) = get_inner_html_from_component(component);
+      let (inner, component) = {
+        let inner_html = component.render().as_inner_html();
+        (inner_html, component)
+      };
       inner_html = inner;
       rc.replace(Some(component));
     });
