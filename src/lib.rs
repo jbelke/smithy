@@ -54,7 +54,7 @@ impl Interface {
 
   pub fn handle_click(&self, e: &str, path: &str) {
     let path: Vec<usize> = serde_json::from_str(path).expect("Invalid path");
-    let event: events::OnClickEvent = serde_json::from_str(e).expect("Invalid event data");
+    let event: events::MouseEvent = serde_json::from_str(e).expect("Invalid event data");
 
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
