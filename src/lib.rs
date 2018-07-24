@@ -4,7 +4,7 @@ extern crate wasm_bindgen;
 use wasm_bindgen::prelude::*;
 
 extern crate jsx_types;
-use jsx_types::*;
+use jsx_types::{*, events};
 
 use std::cell::RefCell;
 
@@ -33,12 +33,12 @@ fn get_inner_html_from_component(mut component: Box<dyn for<'a> Component<'a>>) 
   (inner_html, component)
 }
 
-fn mutate_token<'a, 'b: 'a>(token: &'a mut HtmlToken<'b>, path: &[usize], event_name: &EventName) {
+fn mutate_token<'a, 'b: 'a>(token: &'a mut HtmlToken<'b>, path: &[usize], event_name: &events::EventName) {
   let token_opt = match_token(token, path);
   if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
-    if let Some(handler) = d.event_handlers.get_mut(event_name) {
-      handler(Event {});
-    }
+    // if let Some(handler) = d.event_handlers.get_mut(event_name) {
+    //   handler(Event {});
+    // }
   }
 }
 
@@ -64,7 +64,7 @@ impl Interface {
   pub fn handle_event(&self, e: &str, path: &str) {
     let path: Vec<usize> = serde_json::from_str(path).unwrap();
 
-    let event_name: EventName = e.parse().unwrap();
+    let event_name: events::EventName = e.parse().unwrap();
 
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
