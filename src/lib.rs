@@ -33,15 +33,6 @@ fn get_inner_html_from_component(mut component: Box<dyn for<'a> Component<'a>>) 
   (inner_html, component)
 }
 
-fn mutate_token<'a, 'b: 'a>(token: &'a mut HtmlToken<'b>, path: &[usize], event_name: &events::EventName) {
-  let token_opt = match_token(token, path);
-  if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
-    // if let Some(handler) = d.event_handlers.get_mut(event_name) {
-    //   handler(Event {});
-    // }
-  }
-}
-
 #[wasm_bindgen]
 pub struct Interface {}
 
@@ -61,17 +52,26 @@ impl Interface {
     inner_html
   }
 
-  pub fn handle_event(&self, e: &str, path: &str) {
-    let path: Vec<usize> = serde_json::from_str(path).unwrap();
-
-    let event_name: events::EventName = e.parse().unwrap();
+  pub fn handle_click(&self, e: &str, path: &str) {
+    let path: Vec<usize> = serde_json::from_str(path).expect("Invalid path");
+    let event: events::OnClickEvent = serde_json::from_str(e).expect("Invalid event data");
 
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
       let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
         std::mem::transmute(component)
       };
-      mutate_token(&mut component.render(), &path, &event_name);
+
+      {
+        let token = &mut component.render();
+        let token_opt = match_token(token, &path);
+        if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
+          let event_handlers = &mut d.event_handlers;
+          if let Some(ref mut handler) = event_handlers.on_click {
+            handler(&event);
+          }
+        }
+      }
       rc.replace(Some(component));
     });
   }
