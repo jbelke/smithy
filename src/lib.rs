@@ -35,15 +35,27 @@ pub struct Interface {}
 #[wasm_bindgen]
 impl Interface {
   pub fn get_diff(&self) -> String {
-    let foo: jsx_types::diff::Diff = vec![(
-      vec![],
-      jsx_types::diff::DiffOperation::Replace(
-        jsx_types::diff::ReplaceOperation {
-          new_inner_html: self.get_inner_html(),
+    // let foo: jsx_types::diff::Diff = vec![(
+    //   vec![],
+    //   jsx_types::diff::DiffOperation::Replace(
+    //     jsx_types::diff::ReplaceOperation {
+    //       new_inner_html: self.get_inner_html(),
+    //     }
+    //   )
+    // )];
+    let diff = LAST_RENDERED_TOKEN.with(|rc| {
+      let bare_token_opt = &*rc.borrow();
+      match bare_token_opt {
+        Some(_) => {
+          panic!("unimpleemnted");
+        },
+        None => {
+          jsx_types::diff::DiffOperation::initial_diff(&self.get_inner_html())
         }
-      )
-    )];
-    serde_json::to_string(&foo).unwrap()
+      }
+    });
+
+    serde_json::to_string(&diff).unwrap()
   }
 
 
