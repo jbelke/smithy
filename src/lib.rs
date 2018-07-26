@@ -54,8 +54,6 @@ impl Interface {
       }
     });
     
-    js_fns::log(&format!("{:?}", &diff));
-
     serde_json::to_string(&diff).unwrap() 
   }
 
