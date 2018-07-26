@@ -41,6 +41,8 @@ impl Interface {
       match token_opt {
         Some(old_token) => {
           let new_token = self.render_as_bare_token();
+          // N.B. we need to replace the component like:
+          // rc.replace(Some(new_token))
           new_token.get_diff_with(&old_token)
         },
         None => {
@@ -51,6 +53,8 @@ impl Interface {
         }
       }
     });
+    
+    js_fns::log(&format!("{:?}", &diff));
 
     serde_json::to_string(&diff).unwrap() 
   }
@@ -118,26 +122,10 @@ fn match_token<'a, 'b: 'a>(html_token: &'a mut HtmlToken<'b>, path: &[usize]) ->
     Some((child_index, rest)) => {
       match html_token {
         HtmlToken::DomElement(d) => {
-          // N.B. I could not get a more straightforward filter to work :(
-          let mut count: i32 = -1;
-          let real_index_opt = d.children.iter()
-            .position(|child| {
-              match child {
-                HtmlToken::DomElement(_) => {
-                  count += 1;
-                  &(count as usize) == child_index
-                },
-                _ => false
-              }
-            });
-
-          real_index_opt
-            .and_then(move |index| {
-              match d.children.get_mut(index) {
-                Some(child) => match_token(child, rest),
-                None => None,
-              }
-            })
+          match d.children.get_mut(*child_index) {
+            Some(child) => match_token(child, rest),
+            None => None
+          }
         },
         _ => None,
       }
