@@ -35,31 +35,42 @@ pub struct Interface {}
 #[wasm_bindgen]
 impl Interface {
   pub fn get_diff(&self) -> String {
-    // let foo: jsx_types::diff::Diff = vec![(
-    //   vec![],
-    //   jsx_types::diff::DiffOperation::Replace(
-    //     jsx_types::diff::ReplaceOperation {
-    //       new_inner_html: self.get_inner_html(),
-    //     }
-    //   )
-    // )];
     let diff = LAST_RENDERED_TOKEN.with(|rc| {
-      let bare_token_opt = &*rc.borrow();
-      match bare_token_opt {
-        Some(_) => {
-          panic!("unimpleemnted");
+      let token_opt = rc.replace(None);
+
+      match token_opt {
+        Some(old_token) => {
+          let new_token = self.render_as_bare_token();
+          new_token.get_diff_with(&old_token)
         },
         None => {
+          // N.B. this is a weird place to replace the value of rc.
+          // TODO replace LAST_RENDERED_TOKEN in a render method...
+          rc.replace(Some(self.render_as_bare_token()));
           jsx_types::diff::DiffOperation::initial_diff(&self.get_inner_html())
         }
       }
     });
 
-    serde_json::to_string(&diff).unwrap()
+    serde_json::to_string(&diff).unwrap() 
   }
 
+  fn render_as_bare_token(&self) -> jsx_types::bare::BareHtmlToken {
+    ROOT_COMPONENT.with(|rc| {
+      let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
+      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+        std::mem::transmute(component)
+      };
+      let (ret, component) = {
+        let ret = component.render().as_bare_token();
+        (ret, component)
+      };
+      rc.replace(Some(component));
+      ret
+    })
+  }
 
-  pub fn get_inner_html(&self) -> String {
+  fn get_inner_html(&self) -> String {
     let mut inner_html: String = "".to_string();
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
