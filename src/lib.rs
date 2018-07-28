@@ -1,5 +1,6 @@
 #![feature(wasm_custom_section, wasm_import_module, proc_macro, nll)]
 
+extern crate serde_json;
 extern crate wasm_bindgen;
 use wasm_bindgen::prelude::*;
 
@@ -10,7 +11,6 @@ use std::cell::RefCell;
 
 pub mod js_fns;
 
-extern crate serde_json;
 
 thread_local! {
   static ROOT_COMPONENT: RefCell<Option<Box<Component<'static>>>> = RefCell::new(None);
@@ -42,8 +42,9 @@ impl Interface {
         Some(old_token) => {
           let new_token = self.render_as_bare_token();
           // N.B. we need to replace the component like:
-          // rc.replace(Some(new_token))
-          new_token.get_diff_with(&old_token)
+          let diff = new_token.get_diff_with(&old_token);
+          rc.replace(Some(new_token));
+          diff
         },
         None => {
           // N.B. this is a weird place to replace the value of rc.
