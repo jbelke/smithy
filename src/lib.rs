@@ -14,15 +14,15 @@ pub mod js_fns;
 type ShouldUpdate = bool;
 
 thread_local! {
-  static ROOT_COMPONENT: RefCell<Option<Box<Component<'static>>>> = RefCell::new(None);
+  static ROOT_COMPONENT: RefCell<Option<Box<Component<'static, ()>>>> = RefCell::new(None);
   static LAST_RENDERED_TOKEN: RefCell<Option<jsx_types::bare::BareHtmlToken>> = RefCell::new(None);
 }
 
-pub fn mount(div_id: &str, component: Box<dyn for<'a> Component<'a>>) {
+pub fn mount(div_id: &str, component: Box<dyn for<'a> Component<'a, ()>>) {
   js_fns::initialize(div_id, Interface {});
 
   let component = unsafe {
-    let component_static: Box<dyn Component<'static>> = std::mem::transmute(component);
+    let component_static: Box<dyn Component<'static, ()>> = std::mem::transmute(component);
     component_static
   };
   ROOT_COMPONENT.with(|rc| {
@@ -62,11 +62,11 @@ impl Interface {
   fn render_as_bare_token(&self) -> jsx_types::bare::BareHtmlToken {
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
-      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a, ()> + 'static)> = unsafe {
         std::mem::transmute(component)
       };
       let (ret, component) = {
-        let ret = component.render().as_bare_token();
+        let ret = component.render(()).as_bare_token();
         (ret, component)
       };
       rc.replace(Some(component));
@@ -78,11 +78,11 @@ impl Interface {
     let mut inner_html: String = "".to_string();
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
-      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a, ()> + 'static)> = unsafe {
         std::mem::transmute(component)
       };
       let (inner, component) = {
-        let inner_html = component.render().as_inner_html();
+        let inner_html = component.render(()).as_inner_html();
         (inner_html, component)
       };
       inner_html = inner;
@@ -98,12 +98,12 @@ impl Interface {
 
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
-      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a, ()> + 'static)> = unsafe {
         std::mem::transmute(component)
       };
 
       {
-        let token = &mut component.render();
+        let token = &mut component.render(());
         let token_opt = match_token(token, &path);
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
@@ -125,12 +125,12 @@ impl Interface {
 
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
-      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a, ()> + 'static)> = unsafe {
         std::mem::transmute(component)
       };
 
       {
-        let token = &mut component.render();
+        let token = &mut component.render(());
         let token_opt = match_token(token, &path);
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
@@ -152,12 +152,12 @@ impl Interface {
 
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
-      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a, ()> + 'static)> = unsafe {
         std::mem::transmute(component)
       };
 
       {
-        let token = &mut component.render();
+        let token = &mut component.render(());
         let token_opt = match_token(token, &path);
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
@@ -179,12 +179,12 @@ impl Interface {
 
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
-      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a, ()> + 'static)> = unsafe {
         std::mem::transmute(component)
       };
 
       {
-        let token = &mut component.render();
+        let token = &mut component.render(());
         let token_opt = match_token(token, &path);
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
