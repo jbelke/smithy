@@ -138,7 +138,6 @@ impl Interface {
     }); 
   }
 
-
   pub fn handle_mouse_out(&self, e: &str, path: &str) {
     let path: Vec<usize> = serde_json::from_str(path).expect("Invalid path");
     let event: events::MouseEvent = serde_json::from_str(e).expect("Invalid event data");
@@ -155,6 +154,30 @@ impl Interface {
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
           if let Some(ref mut handler) = event_handlers.on_mouse_out {
+            handler(&event);
+          }
+        }
+      }
+      rc.replace(Some(component));
+    }); 
+  }
+
+  pub fn handle_input(&self, e: &str, path: &str) {
+    let path: Vec<usize> = serde_json::from_str(path).expect("Invalid path");
+    let event: events::InputEvent = serde_json::from_str(e).expect("Invalid event data");
+
+    ROOT_COMPONENT.with(|rc| {
+      let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
+      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a> + 'static)> = unsafe {
+        std::mem::transmute(component)
+      };
+
+      {
+        let token = &mut component.render();
+        let token_opt = match_token(token, &path);
+        if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
+          let event_handlers = &mut d.event_handlers;
+          if let Some(ref mut handler) = event_handlers.on_input {
             handler(&event);
           }
         }
