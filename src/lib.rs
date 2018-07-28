@@ -11,6 +11,7 @@ use std::cell::RefCell;
 
 pub mod js_fns;
 
+type ShouldUpdate = bool;
 
 thread_local! {
   static ROOT_COMPONENT: RefCell<Option<Box<Component<'static>>>> = RefCell::new(None);
@@ -90,9 +91,10 @@ impl Interface {
     inner_html
   }
 
-  pub fn handle_click(&self, e: &str, path: &str) {
+  pub fn handle_click(&self, e: &str, path: &str) -> ShouldUpdate {
     let path: Vec<usize> = serde_json::from_str(path).expect("Invalid path");
     let event: events::MouseEvent = serde_json::from_str(e).expect("Invalid event data");
+    let mut should_update = false;
 
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
@@ -106,17 +108,20 @@ impl Interface {
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
           if let Some(ref mut handler) = event_handlers.on_click {
+            should_update = true;
             handler(&event);
           }
         }
       }
       rc.replace(Some(component));
     });
+    return should_update;
   }
 
-  pub fn handle_mouse_over(&self, e: &str, path: &str) {
+  pub fn handle_mouse_over(&self, e: &str, path: &str) -> ShouldUpdate {
     let path: Vec<usize> = serde_json::from_str(path).expect("Invalid path");
     let event: events::MouseEvent = serde_json::from_str(e).expect("Invalid event data");
+    let mut should_update = false;
 
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
@@ -130,17 +135,20 @@ impl Interface {
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
           if let Some(ref mut handler) = event_handlers.on_mouse_over {
+            should_update = true;
             handler(&event);
           }
         }
       }
       rc.replace(Some(component));
-    }); 
+    });
+    return should_update;
   }
 
-  pub fn handle_mouse_out(&self, e: &str, path: &str) {
+  pub fn handle_mouse_out(&self, e: &str, path: &str) -> ShouldUpdate {
     let path: Vec<usize> = serde_json::from_str(path).expect("Invalid path");
     let event: events::MouseEvent = serde_json::from_str(e).expect("Invalid event data");
+    let mut should_update = false;
 
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
@@ -154,17 +162,20 @@ impl Interface {
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
           if let Some(ref mut handler) = event_handlers.on_mouse_out {
+            should_update = true;
             handler(&event);
           }
         }
       }
       rc.replace(Some(component));
     }); 
+    return should_update;
   }
 
-  pub fn handle_input(&self, e: &str, path: &str) {
+  pub fn handle_input(&self, e: &str, path: &str) -> ShouldUpdate {
     let path: Vec<usize> = serde_json::from_str(path).expect("Invalid path");
     let event: events::InputEvent = serde_json::from_str(e).expect("Invalid event data");
+    let mut should_update = false;
 
     ROOT_COMPONENT.with(|rc| {
       let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
@@ -178,12 +189,14 @@ impl Interface {
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
           if let Some(ref mut handler) = event_handlers.on_input {
+            should_update = true;
             handler(&event);
           }
         }
       }
       rc.replace(Some(component));
-    }); 
+    });
+    return should_update;
   }
 }
 
