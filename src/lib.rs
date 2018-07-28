@@ -66,7 +66,7 @@ impl Interface {
         std::mem::transmute(component)
       };
       let (ret, component) = {
-        let ret = component.render(()).as_bare_token();
+        let ret = component.render( ()).as_bare_token();
         (ret, component)
       };
       rc.replace(Some(component));
@@ -82,7 +82,7 @@ impl Interface {
         std::mem::transmute(component)
       };
       let (inner, component) = {
-        let inner_html = component.render(()).as_inner_html();
+        let inner_html = component.render( ()).as_inner_html();
         (inner_html, component)
       };
       inner_html = inner;
@@ -103,7 +103,7 @@ impl Interface {
       };
 
       {
-        let token = &mut component.render(());
+        let token = &mut component.render( ());
         let token_opt = match_token(token, &path);
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
@@ -118,7 +118,7 @@ impl Interface {
     return should_update;
   }
 
-  pub fn handle_mouse_over(&self, e: &str, path: &str) -> ShouldUpdate {
+  pub fn handle_mouseover(&self, e: &str, path: &str) -> ShouldUpdate {
     let path: Vec<usize> = serde_json::from_str(path).expect("Invalid path");
     let event: events::MouseEvent = serde_json::from_str(e).expect("Invalid event data");
     let mut should_update = false;
@@ -130,7 +130,7 @@ impl Interface {
       };
 
       {
-        let token = &mut component.render(());
+        let token = &mut component.render( ());
         let token_opt = match_token(token, &path);
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
@@ -145,7 +145,7 @@ impl Interface {
     return should_update;
   }
 
-  pub fn handle_mouse_out(&self, e: &str, path: &str) -> ShouldUpdate {
+  pub fn handle_mouseout(&self, e: &str, path: &str) -> ShouldUpdate {
     let path: Vec<usize> = serde_json::from_str(path).expect("Invalid path");
     let event: events::MouseEvent = serde_json::from_str(e).expect("Invalid event data");
     let mut should_update = false;
@@ -157,7 +157,7 @@ impl Interface {
       };
 
       {
-        let token = &mut component.render(());
+        let token = &mut component.render( ());
         let token_opt = match_token(token, &path);
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
@@ -184,7 +184,7 @@ impl Interface {
       };
 
       {
-        let token = &mut component.render(());
+        let token = &mut component.render( ());
         let token_opt = match_token(token, &path);
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
@@ -198,6 +198,34 @@ impl Interface {
     });
     return should_update;
   }
+
+  pub fn handle_keydown(&self, e: &str, path: &str) -> ShouldUpdate {
+    let path: Vec<usize> = serde_json::from_str(path).expect("Invalid path");
+    let event: events::KeyboardEvent = serde_json::from_str(e).expect("Invalid event data");
+    let mut should_update = false;
+
+    ROOT_COMPONENT.with(|rc| {
+      let component = rc.replace(None).expect("ROOT_COMPONENT is missing");
+      let mut component: std::boxed::Box<(dyn for<'a> jsx_types::Component<'a, ()> + 'static)> = unsafe {
+        std::mem::transmute(component)
+      };
+
+      {
+        let token = &mut component.render( ());
+        let token_opt = match_token(token, &path);
+        if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
+          let event_handlers = &mut d.event_handlers;
+          if let Some(ref mut handler) = event_handlers.on_keydown {
+            should_update = true;
+            handler(&event);
+          }
+        }
+      }
+      rc.replace(Some(component));
+    });
+    return should_update;
+  }
+ 
 }
 
 
