@@ -38,24 +38,14 @@ fn mount_to_element(el: &Element, mut component: ComponentAlt) {
     js_fns::log(&format!("{:?}", token));
     el.set_inner_html(&token.as_inner_html());
   }
-  store_root_component(component);
-}
-
-fn store_root_component(component: ComponentAlt) {
-  ROOT_COMPONENT.with(|rc| {
-    rc.replace(Some(component));
-  });
+  ROOT_COMPONENT.store(component);
 }
 
 fn store_root_element(el: Element) {
   let html_el = unsafe {
     std::mem::transmute::<Element, HtmlElement>(el)
   };
-  js_fns::log("initializating root c");
-  ROOT_ELEMENT.with(|rc| {
-    js_fns::log(&format!("settin"));
-    rc.replace(Some(html_el));
-  });
+  ROOT_ELEMENT.store(html_el);
 }
 
 fn find_child_index(parent: &Node, child: &Node) -> usize {
@@ -70,13 +60,44 @@ fn find_child_index(parent: &Node, child: &Node) -> usize {
   panic!("child not found in parent");
 }
 
+fn match_token<'a, 'b: 'a>(
+  html_token: &'a mut HtmlToken<'b>,
+  path: &[usize]
+) -> Option<&'a mut HtmlToken<'b>> {
+  match path.split_first() {
+    None => Some(html_token),
+    Some((child_index, rest)) => {
+      match html_token {
+        HtmlToken::DomElement(d) => {
+          match d.children.get_mut(*child_index) {
+            Some(child) => match_token(child, rest),
+            None => None
+          }
+        },
+        _ => None,
+      }
+    },
+  }
+}
+
 fn get_path_from(root_element: &HtmlElement, target_element: &HtmlElement) -> Vec<usize> {
+  js_fns::log(&format!(
+    "get path from root =\n{}\ntarget =\n{}",
+    root_element.inner_text(),
+    target_element.inner_text()
+  ));
   let root_node: &Node = unsafe {
     std::mem::transmute::<&HtmlElement, &Node>(root_element)
   };
   let target_node: &Node = unsafe {
     std::mem::transmute::<&HtmlElement, &Node>(target_element)
   };
+
+  // special case, we clicked on the root element
+  // TODO can this be handled without a special case
+  // if root_node.is_same_node(Some(target_node)) {
+  //   return vec![];
+  // }
 
   let mut current_node = target_node.parent_node().unwrap();
   let mut path = vec![find_child_index(&current_node, target_node)];
@@ -130,8 +151,6 @@ pub fn mount(div_id: &str, component: ComponentAlt) {
   let doc: Document = get_document();
   let el_opt: Option<Element> = doc.get_element_by_id(div_id);
   
-  // let el2 = js_fns::get_html_element_by_id(&doc, div_id);
-
   match el_opt {
     Some(el) => {
       mount_to_element(&el, component);
@@ -318,23 +337,4 @@ impl Interface {
     return should_update;
   }
  
-}
-
-
-
-fn match_token<'a, 'b: 'a>(html_token: &'a mut HtmlToken<'b>, path: &[usize]) -> Option<&'a mut HtmlToken<'b>> {
-  match path.split_first() {
-    None => Some(html_token),
-    Some((child_index, rest)) => {
-      match html_token {
-        HtmlToken::DomElement(d) => {
-          match d.children.get_mut(*child_index) {
-            Some(child) => match_token(child, rest),
-            None => None
-          }
-        },
-        _ => None,
-      }
-    },
-  }
 }

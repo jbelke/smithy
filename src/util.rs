@@ -3,6 +3,7 @@ use std::thread::LocalKey;
 
 pub trait WithInnerValue<T> {
   fn with_inner_value(&'static self, callback: impl Fn(&mut T));
+  fn store(&'static self, val: T);
 }
 
 impl<T> WithInnerValue<T> for LocalKey<RefCell<Option<T>>> {
@@ -16,4 +17,11 @@ impl<T> WithInnerValue<T> for LocalKey<RefCell<Option<T>>> {
       rc.replace(val_opt);
     });
   }
+
+  fn store(&'static self, val: T) {
+    self.with(|rc| {
+      rc.replace(Some(val));
+    });
+  }
 }
+
