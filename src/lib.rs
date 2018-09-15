@@ -13,6 +13,9 @@ use bare::BareHtmlToken;
 
 use std::cell::RefCell;
 
+mod util;
+use util::*;
+
 use web_sys::{Element, Document, Window, MouseEvent, HtmlElement, EventTarget, Event, Node};
 
 pub mod js_fns;
@@ -21,19 +24,27 @@ type ShouldUpdate = bool;
 type ComponentAlt = Box<dyn for<'a> Component<'a, ()>>;
 
 thread_local! {
-  // DO NOT USE
-  static ROOT_COMPONENT: RefCell<Option<ComponentAlt>> = RefCell::new(None);
+  // for diff's only
   static LAST_RENDERED_TOKEN: RefCell<Option<jsx_types::bare::BareHtmlToken>> = RefCell::new(None);
-
-  // NEW
+  static ROOT_COMPONENT: RefCell<Option<ComponentAlt>> = RefCell::new(None);
   static ROOT_ELEMENT: RefCell<Option<HtmlElement>> = RefCell::new(None);
 }
 
 fn get_document() -> Document { Window::document().unwrap() }
 
 fn mount_to_element(el: &Element, mut component: ComponentAlt) {
-  let token: BareHtmlToken = component.render(()).as_bare_token();
-  el.set_inner_html(&token.as_inner_html());
+  {
+    let token = component.render(());
+    js_fns::log(&format!("{:?}", token));
+    el.set_inner_html(&token.as_inner_html());
+  }
+  store_root_component(component);
+}
+
+fn store_root_component(component: ComponentAlt) {
+  ROOT_COMPONENT.with(|rc| {
+    rc.replace(Some(component));
+  });
 }
 
 fn store_root_element(el: Element) {
@@ -56,8 +67,7 @@ fn find_child_index(parent: &Node, child: &Node) -> usize {
       }
     }
   }
-  // LOL STFU no... should we panic here?
-  0
+  panic!("child not found in parent");
 }
 
 fn get_path_from(root_element: &HtmlElement, target_element: &HtmlElement) -> Vec<usize> {
@@ -96,14 +106,20 @@ fn attach_listeners(el: &Element) {
       let target_html_el: HtmlElement = unsafe {
         std::mem::transmute::<EventTarget, HtmlElement>(t)
       };
-      ROOT_ELEMENT.with(|rc| {
-        let root_element_opt = rc.replace(None);
-        if let Some(root_element) = root_element_opt {
-          let path = get_path_from(&root_element, &target_html_el);
-          js_fns::log(&format!("got root element bra with path {:?}", path));
-          rc.replace(Some(root_element));
-        }
-      })
+      ROOT_ELEMENT.with_inner_value(|root_element| {
+        let path = get_path_from(&root_element, &target_html_el);
+        js_fns::log(&format!("got root element bra with path {:?}", path));
+
+        ROOT_COMPONENT.with_inner_value(|root_component| {
+          let mut top_level_token: HtmlToken = root_component.render(());
+          match match_token(&mut top_level_token, &path) {
+            Some(target_token) => {
+              js_fns::log(&format!("found target {}", target_token.as_inner_html()));
+            },
+            None => { js_fns::log("DID NOT FIND you fail at life"); },
+          }
+        });
+      });
     }
   });
   html_el.set_onclick(&on_click_cb);
@@ -127,11 +143,6 @@ pub fn mount(div_id: &str, component: ComponentAlt) {
     },
   };
 }
-
-#[wasm_bindgen]
-pub fn trigger_click() {
-  js_fns::log("clickadee-doo");
-} 
 
 #[wasm_bindgen]
 pub struct Interface {}
@@ -197,7 +208,7 @@ impl Interface {
       let mut component = rc.replace(None).expect("ROOT_COMPONENT is missing");
 
       {
-        let token = &mut component.render( ());
+        let token = &mut component.render(());
         let token_opt = match_token(token, &path);
         if let Some(HtmlToken::DomElement(ref mut d)) = token_opt {
           let event_handlers = &mut d.event_handlers;
