@@ -36,7 +36,7 @@ fn mount_to_element(el: &Element, mut component: ComponentAlt) {
   {
     let token = component.render(());
     js_fns::log(&format!("{:?}", token));
-    el.set_inner_html(&token.as_inner_html());
+    el.set_inner_html(&format!("outer->{}", token.as_inner_html()));
   }
   ROOT_COMPONENT.store(component);
 }
@@ -95,21 +95,35 @@ fn get_path_from(root_element: &HtmlElement, target_element: &HtmlElement) -> Ve
 
   // special case, we clicked on the root element
   // TODO can this be handled without a special case
-  // if root_node.is_same_node(Some(target_node)) {
-  //   return vec![];
-  // }
+  if target_node.is_same_node(Some(&root_node)) {
+    js_fns::log("root is same as target");
+    return vec![];
+  }
 
   let mut current_node = target_node.parent_node().unwrap();
-  let mut path = vec![find_child_index(&current_node, target_node)];
+  let mut path = vec![find_child_index(&current_node, &target_node)];
+
+  if current_node.is_same_node(Some(&root_node)) {
+    js_fns::log("current is same as target");
+    return path;
+  }
+
   while let Some(parent) = current_node.parent_node() {
-    path.push(find_child_index(&parent, &current_node));
+    js_fns::log("in iteration");
+    js_fns::log(&format!(
+      "get_path_from while loop - parent= \n{} \n",
+      unsafe { std::mem::transmute::<&Node, &HtmlElement>(&parent) }.inner_text()
+      // unsafe { std::mem::transmute::<&Node, &HtmlElement>(&current_node) }.inner_text()
+    ));
     if parent.is_same_node(Some(&root_node)) {
-      break;
+      return path;
     }
+    path.push(find_child_index(&parent, &current_node));
     current_node = parent;
   }
 
-  path
+  js_fns::log(&format!("did not get a successful path, got path {:?}", path));
+  panic!("");
 }
 
 fn attach_listeners(el: &Element) {
@@ -118,7 +132,7 @@ fn attach_listeners(el: &Element) {
   };
 
   let on_click_cb = Closure::new(|e: MouseEvent| {
-    js_fns::log(&format!("on click handler {:?}", e.client_y()));
+    js_fns::log("\n\nclick handler starting");
 
     let event = unsafe {
       std::mem::transmute::<MouseEvent, Event>(e)
@@ -128,8 +142,8 @@ fn attach_listeners(el: &Element) {
         std::mem::transmute::<EventTarget, HtmlElement>(t)
       };
       ROOT_ELEMENT.with_inner_value(|root_element| {
-        let path = get_path_from(&root_element, &target_html_el);
-        js_fns::log(&format!("got root element bra with path {:?}", path));
+        let path = get_path_from(root_element, &target_html_el);
+        js_fns::log(&format!("attach listeners onclick cb: path = {:?}", path));
 
         ROOT_COMPONENT.with_inner_value(|root_component| {
           let mut top_level_token: HtmlToken = root_component.render(());
