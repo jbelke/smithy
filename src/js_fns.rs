@@ -3,8 +3,6 @@ use wasm_bindgen::prelude::*;
 
 use web_sys::MouseEvent;
 
-use super::Interface;
-
 #[wasm_bindgen]
 extern {
   #[wasm_bindgen]
@@ -15,9 +13,6 @@ extern {
 
   #[wasm_bindgen(js_namespace = console, js_name=error)]
   pub fn log_error(msg: &str);
-
-  #[wasm_bindgen(module = "./lib")]
-  pub fn initialize(id: &str, interface: Interface);
 
   #[wasm_bindgen(js_name = setInterval)]
   pub fn set_interval(cb: &Closure<FnMut()>, delay: u32) -> f64;
