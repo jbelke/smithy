@@ -35,8 +35,8 @@ fn get_document() -> Document { Window::document().unwrap() }
 fn mount_to_element(el: &Element, mut component: ComponentAlt) {
   {
     let token = component.render(());
-    js_fns::log(&format!("{:?}", token));
-    el.set_inner_html(&format!("outer->{}", token.as_inner_html()));
+    js_fns::log(&format!("bout to render {:?}", token));
+    el.set_inner_html(&token.as_inner_html());
   }
   ROOT_COMPONENT.store(component);
 }
@@ -81,6 +81,7 @@ fn match_token<'a, 'b: 'a>(
 }
 
 fn get_path_from(root_element: &HtmlElement, target_element: &HtmlElement) -> Vec<usize> {
+  // TODO this method can be cleaned up a bit, especially around the return vec![] lines
   js_fns::log(&format!(
     "get path from root =\n{}\ntarget =\n{}",
     root_element.inner_text(),
@@ -93,28 +94,20 @@ fn get_path_from(root_element: &HtmlElement, target_element: &HtmlElement) -> Ve
     std::mem::transmute::<&HtmlElement, &Node>(target_element)
   };
 
-  // special case, we clicked on the root element
-  // TODO can this be handled without a special case
+  // special case, we clicked on the <div id="app" /> node,
+  // but that shouldn't be possible unless that node has some padding
   if target_node.is_same_node(Some(&root_node)) {
-    js_fns::log("root is same as target");
     return vec![];
   }
 
   let mut current_node = target_node.parent_node().unwrap();
-  let mut path = vec![find_child_index(&current_node, &target_node)];
 
   if current_node.is_same_node(Some(&root_node)) {
-    js_fns::log("current is same as target");
-    return path;
+    return vec![];
   }
 
+  let mut path = vec![find_child_index(&current_node, target_node)];
   while let Some(parent) = current_node.parent_node() {
-    js_fns::log("in iteration");
-    js_fns::log(&format!(
-      "get_path_from while loop - parent= \n{} \n",
-      unsafe { std::mem::transmute::<&Node, &HtmlElement>(&parent) }.inner_text()
-      // unsafe { std::mem::transmute::<&Node, &HtmlElement>(&current_node) }.inner_text()
-    ));
     if parent.is_same_node(Some(&root_node)) {
       return path;
     }
@@ -132,8 +125,6 @@ fn attach_listeners(el: &Element) {
   };
 
   let on_click_cb = Closure::new(|e: MouseEvent| {
-    js_fns::log("\n\nclick handler starting");
-
     let event = unsafe {
       std::mem::transmute::<MouseEvent, Event>(e)
     };
@@ -143,13 +134,17 @@ fn attach_listeners(el: &Element) {
       };
       ROOT_ELEMENT.with_inner_value(|root_element| {
         let path = get_path_from(root_element, &target_html_el);
-        js_fns::log(&format!("attach listeners onclick cb: path = {:?}", path));
+        js_fns::log(&format!("on click cb: path = {:?}", path));
 
         ROOT_COMPONENT.with_inner_value(|root_component| {
           let mut top_level_token: HtmlToken = root_component.render(());
           match match_token(&mut top_level_token, &path) {
             Some(target_token) => {
               js_fns::log(&format!("found target {}", target_token.as_inner_html()));
+
+              if let HtmlToken::DomElement(d) = target_token {
+                js_fns::log(&format!("has on click {}", d.event_handlers.on_click.is_some()));
+              }
             },
             None => { js_fns::log("DID NOT FIND you fail at life"); },
           }
