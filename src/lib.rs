@@ -8,19 +8,29 @@ extern crate jsx_types;
 extern crate web_sys;
 extern crate js_sys;
 
-use jsx_types::{*, events, bare};
-use bare::BareHtmlToken;
+use jsx_types::{*, diff};
 
 use std::cell::RefCell;
 
 mod util;
 use util::*;
 
-use web_sys::{Element, Document, Window, MouseEvent, HtmlElement, EventTarget, Event, Node};
+use web_sys::{
+  Element,
+  Document,
+  Window,
+  MouseEvent,
+  HtmlElement,
+  HtmlTemplateElement,
+  EventTarget,
+  Event,
+  Node,
+  DocumentFragment,
+};
 
 pub mod js_fns;
 
-type ShouldUpdate = bool;
+// type ShouldUpdate = bool;
 type ComponentAlt = Box<dyn for<'a> Component<'a, ()>>;
 
 thread_local! {
@@ -35,8 +45,8 @@ fn get_document() -> Document { Window::document().unwrap() }
 fn mount_to_element(el: &Element, mut component: ComponentAlt) {
   {
     let token = component.render(());
-    js_fns::log(&format!("bout to render {:?}", token));
     el.set_inner_html(&token.as_inner_html());
+    LAST_RENDERED_TOKEN.store(token.as_bare_token());
   }
   ROOT_COMPONENT.store(component);
 }
@@ -82,11 +92,6 @@ fn match_token<'a, 'b: 'a>(
 
 fn get_path_from(root_element: &HtmlElement, target_element: &HtmlElement) -> Vec<usize> {
   // TODO this method can be cleaned up a bit, especially around the return vec![] lines
-  js_fns::log(&format!(
-    "get path from root =\n{}\ntarget =\n{}",
-    root_element.inner_text(),
-    target_element.inner_text()
-  ));
   let root_node: &Node = unsafe {
     std::mem::transmute::<&HtmlElement, &Node>(root_element)
   };
@@ -115,8 +120,51 @@ fn get_path_from(root_element: &HtmlElement, target_element: &HtmlElement) -> Ve
     current_node = parent;
   }
 
-  js_fns::log(&format!("did not get a successful path, got path {:?}", path));
   panic!("");
+}
+
+fn convert_node_reference_to_owned(node: &Node) -> Node {
+  // N.B. this method smells and should be gotten rid of and never ever used.
+  let parent = node.parent_node().unwrap();
+  let index_to_root = find_child_index(&parent, node);
+  parent.child_nodes().get(index_to_root as u32).unwrap()
+}
+
+fn find_node_by_path(root_node: &Node, path: &[usize]) -> Option<Node> {
+  path.iter().fold(Some(convert_node_reference_to_owned(root_node)), |node_opt, path_segment| {
+    node_opt.and_then(|node| node.child_nodes().get(*path_segment as u32))
+  })
+}
+
+fn apply_diff(root_el: &HtmlElement, diff: diff::Diff) {
+  let root_node = unsafe {
+    std::mem::transmute::<&HtmlElement, &Node>(root_el)
+  };
+  for (path, op) in diff {
+    match op {
+      diff::DiffOperation::Replace(replace_operation) => {
+        // replace_node(node, replace_operation.new_inner_html);
+        let (last_segment, path_to_parent) = path.split_last().unwrap();
+        let parent = find_node_by_path(root_node, path_to_parent).unwrap();
+        let original_child = parent.child_nodes().get(*last_segment as u32).unwrap();
+        // parent.remove_child(&child);
+
+        let new_el = get_document().create_element("template").unwrap();
+        new_el.set_inner_html(&replace_operation.new_inner_html);
+        let new_template = unsafe {
+          std::mem::transmute::<Element, HtmlTemplateElement>(new_el)
+        };
+        let content_document_fragment = new_template.content();
+        let content_node = unsafe {
+          std::mem::transmute::<DocumentFragment, Node>(content_document_fragment)
+        };
+        let new_node = content_node.first_child().unwrap();
+
+        parent.replace_child(&new_node, &original_child);
+      },
+      _ => js_fns::log("something else"),
+    };
+  }
 }
 
 fn attach_listeners(el: &Element) {
@@ -134,28 +182,40 @@ fn attach_listeners(el: &Element) {
       };
       ROOT_ELEMENT.with_inner_value(|root_element| {
         let path = get_path_from(root_element, &target_html_el);
-        js_fns::log(&format!("on click cb: path = {:?}", path));
 
-        ROOT_COMPONENT.with_inner_value(|root_component| {
-          let mut top_level_token: HtmlToken = root_component.render(());
-          match match_token(&mut top_level_token, &path) {
-            Some(target_token) => {
-              js_fns::log(&format!("found target {}", target_token.as_inner_html()));
-
-              if let HtmlToken::DomElement(d) = target_token {
-                if let Some(ref mut on_click) = d.event_handlers.on_click {
-                  let mouse_event = unsafe {
-                    std::mem::transmute::<&Event, &MouseEvent>(&event)
-                  };
-                  js_fns::log("bout to click it");
-                  on_click(&mouse_event);
-                  // TODO re-render
-                }
-              }
-            },
-            None => { js_fns::log("DID NOT FIND you fail at life"); },
-          }
+        let diff_opt = ROOT_COMPONENT.with_inner_value(|root_component| {
+          let should_rerender = {
+            let mut top_level_token: HtmlToken = root_component.render(());
+            match match_token(&mut top_level_token, &path) {
+              Some(target_token) => {
+                if let HtmlToken::DomElement(d) = target_token {
+                  if let Some(ref mut on_click) = d.event_handlers.on_click {
+                    let mouse_event = unsafe {
+                      std::mem::transmute::<&Event, &MouseEvent>(&event)
+                    };
+                    on_click(&mouse_event);
+                    true
+                  } else { false }
+                } else { false }
+              },
+              None => { false },
+            }
+          };
+          if should_rerender {
+            // we've updated things due to the call to on_click!
+            let new_token = root_component.render(()).as_bare_token();
+            let diff = LAST_RENDERED_TOKEN.with_inner_value(|old_token| {
+              let diff = new_token.get_diff_with(old_token);
+              diff
+            });
+            LAST_RENDERED_TOKEN.store(new_token);
+            Some(diff)
+          } else { None }
         });
+
+        if let Some(diff) = diff_opt {
+          apply_diff(root_element, diff);
+        }
       });
     }
   });

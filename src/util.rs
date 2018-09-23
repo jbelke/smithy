@@ -2,20 +2,22 @@ use std::cell::RefCell;
 use std::thread::LocalKey;
 
 pub trait WithInnerValue<T> {
-  fn with_inner_value(&'static self, callback: impl Fn(&mut T));
+  fn with_inner_value<R>(&'static self, callback: impl Fn(&mut T) -> R) -> R;
   fn store(&'static self, val: T);
+  // TODO implement
+  // fn replace_inner_value(&'static self, callback: impl Fn(T));
 }
 
 impl<T> WithInnerValue<T> for LocalKey<RefCell<Option<T>>> {
-  fn with_inner_value(&'static self, callback: impl Fn(&mut T)) {
+  fn with_inner_value<R>(&'static self, callback: impl Fn(&mut T) -> R) -> R {
     self.with(|rc| {
-      let mut val_opt = rc.replace(None);
-      match val_opt {
-        Some(ref mut inner) => callback(inner),
-        None => (),
-      };
-      rc.replace(val_opt);
-    });
+      let val_opt = rc.replace(None);
+      // TODO don't unwrap here, but what to do instead?
+      let mut val = val_opt.unwrap();
+      let new_val = callback(&mut val);
+      rc.replace(Some(val));
+      new_val
+    })
   }
 
   fn store(&'static self, val: T) {
