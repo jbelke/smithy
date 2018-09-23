@@ -136,33 +136,62 @@ fn find_node_by_path(root_node: &Node, path: &[usize]) -> Option<Node> {
   })
 }
 
+fn get_node_from_inner_html(inner_html: &str) -> Node {
+  let new_el = get_document().create_element("template").unwrap();
+  new_el.set_inner_html(inner_html);
+  let new_template = unsafe {
+    std::mem::transmute::<Element, HtmlTemplateElement>(new_el)
+  };
+  let content_document_fragment = new_template.content();
+  let content_node = unsafe {
+    std::mem::transmute::<DocumentFragment, Node>(content_document_fragment)
+  };
+  content_node.first_child().unwrap()
+}
+
 fn apply_diff(root_el: &HtmlElement, diff: diff::Diff) {
   let root_node = unsafe {
     std::mem::transmute::<&HtmlElement, &Node>(root_el)
   };
+  js_fns::log("\napplying diff");
   for (path, op) in diff {
+    js_fns::log(&format!("diff: op {:?} path {:?}", op, path));
     match op {
       diff::DiffOperation::Replace(replace_operation) => {
-        // replace_node(node, replace_operation.new_inner_html);
         let (last_segment, path_to_parent) = path.split_last().unwrap();
         let parent = find_node_by_path(root_node, path_to_parent).unwrap();
         let original_child = parent.child_nodes().get(*last_segment as u32).unwrap();
-        // parent.remove_child(&child);
-
-        let new_el = get_document().create_element("template").unwrap();
-        new_el.set_inner_html(&replace_operation.new_inner_html);
-        let new_template = unsafe {
-          std::mem::transmute::<Element, HtmlTemplateElement>(new_el)
-        };
-        let content_document_fragment = new_template.content();
-        let content_node = unsafe {
-          std::mem::transmute::<DocumentFragment, Node>(content_document_fragment)
-        };
-        let new_node = content_node.first_child().unwrap();
-
+        let new_node = get_node_from_inner_html(&replace_operation.new_inner_html);
         parent.replace_child(&new_node, &original_child);
       },
-      _ => js_fns::log("something else"),
+      diff::DiffOperation::Insert(insert_operation) => {
+        let (last_segment, path_to_parent) = path.split_last().unwrap();
+        let parent = find_node_by_path(root_node, path_to_parent).unwrap();
+        let new_node = get_node_from_inner_html(&insert_operation.new_inner_html);
+        let child_opt = parent.child_nodes().get(*last_segment as u32);
+        // N.B. this is because parent.insert_before(&new_node, child_opt) gives me
+        // note: expected type `std::option::Option<&web_sys::Node>`
+        // found type `&std::option::Option<web_sys::Node>`
+        match child_opt {
+          Some(child) => parent.insert_before(&new_node, Some(&child)),
+          None => parent.insert_before(&new_node, None)
+        };
+      },
+      diff::DiffOperation::Delete(delete_operation) => {
+        let (last_segment, path_to_parent) = path.split_last().unwrap();
+        let parent = find_node_by_path(root_node, path_to_parent).unwrap();
+        let original_child = parent.child_nodes().get(*last_segment as u32).unwrap();
+        parent.remove_child(&original_child);
+      },
+      diff::DiffOperation::UpdateAttributes(update_attributes_operation) => {
+        let node = find_node_by_path(root_node, &path).unwrap();
+        let element = unsafe {
+          std::mem::transmute::<Node, Element>(node)
+        };
+        for (attribute, value) in update_attributes_operation.new_attributes {
+          element.set_attribute(&attribute, &value);
+        }
+      },
     };
   }
 }
