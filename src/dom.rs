@@ -1,4 +1,5 @@
 use jsx_types::{*, diff};
+// use super::js_fns;
 
 use std::mem::transmute;
 use web_sys::{
@@ -49,6 +50,7 @@ pub fn get_path_from(root_element: &HtmlElement, target_element: &HtmlElement) -
   let mut path = vec![find_child_index(&current_node, target_node)];
   while let Some(parent) = current_node.parent_node() {
     if parent.is_same_node(Some(&root_node)) {
+      path.reverse();
       return path;
     }
     path.push(find_child_index(&parent, &current_node));
@@ -120,8 +122,8 @@ pub fn apply_diff(root_el: &HtmlElement, diff: diff::Diff) {
       diff::DiffOperation::Delete(_) => {
         let (last_segment, path_to_parent) = path.split_last().unwrap();
         let parent = find_node_by_path(root_node, path_to_parent).unwrap();
-        let original_child = parent.child_nodes().get(*last_segment as u32).unwrap();
-        let _ = parent.remove_child(&original_child);
+        let child = parent.child_nodes().get(*last_segment as u32).unwrap();
+        let _ = parent.remove_child(&child);
       },
       diff::DiffOperation::UpdateAttributes(update_attributes_operation) => {
         let node = find_node_by_path(root_node, &path).unwrap();

@@ -47,7 +47,6 @@ thread_local! {
 fn mount_to_element(el: &Element, mut component: ComponentAlt) {
   {
     let token = component.render(());
-    js_fns::log(&format!("mount - {:?}", token.as_inner_html()));
     el.set_inner_html(&token.as_inner_html());
     LAST_RENDERED_TOKEN.store(token.as_bare_token());
   }
@@ -68,7 +67,6 @@ fn get_diff(root_component: &mut ComponentAlt) -> diff::Diff {
     diff
   });
   LAST_RENDERED_TOKEN.store(new_token);
-  js_fns::log(&format!("diff - {:?}", diff));
   diff
 }
 
@@ -81,7 +79,6 @@ fn attach_listeners(el: &Element) {
 
   // CLICK
   let on_click_cb = Closure::new(|e: MouseEvent| {
-    js_fns::log("on click");
     let event: Event = e.into();
     if let Some(t) = event.target() {
       let target_html_el: HtmlElement = unsafe {
@@ -93,15 +90,12 @@ fn attach_listeners(el: &Element) {
         let diff_opt = ROOT_COMPONENT.with_inner_value(|root_component| {
           {
             let mut top_level_token: HtmlToken = root_component.render(());
-            js_fns::log(&format!("1 path - {:?}", path));
             find_token_by_path(&mut top_level_token, &path).and_then(|target_token| {
-              js_fns::log(&format!("2 and then {:?}", target_token.as_inner_html()));
               if let HtmlToken::DomElement(d) = target_token {
                 if let Some(ref mut on_click) = d.event_handlers.on_click {
                   let mouse_event = unsafe {
                     transmute::<&Event, &MouseEvent>(&event)
                   };
-                  js_fns::log("executing on click");
                   on_click(&mouse_event);
                   Some(())
                 } else { None }
