@@ -27,6 +27,8 @@ use web_sys::{
   Element,
   Document,
   MouseEvent,
+  KeyboardEvent,
+  InputEvent,
   HtmlElement,
   EventTarget,
   Event,
@@ -45,6 +47,7 @@ thread_local! {
 fn mount_to_element(el: &Element, mut component: ComponentAlt) {
   {
     let token = component.render(());
+    js_fns::log(&format!("mount - {:?}", token.as_inner_html()));
     el.set_inner_html(&token.as_inner_html());
     LAST_RENDERED_TOKEN.store(token.as_bare_token());
   }
@@ -58,15 +61,28 @@ fn store_root_element(el: Element) {
   ROOT_ELEMENT.store(html_el);
 }
 
+fn get_diff(root_component: &mut ComponentAlt) -> diff::Diff {
+  let new_token = root_component.render(()).as_bare_token();
+  let diff = LAST_RENDERED_TOKEN.with_inner_value(|old_token| {
+    let diff = new_token.get_diff_with(old_token);
+    diff
+  });
+  LAST_RENDERED_TOKEN.store(new_token);
+  js_fns::log(&format!("diff - {:?}", diff));
+  diff
+}
+
 fn attach_listeners(el: &Element) {
   let html_el = unsafe {
     transmute::<&Element, &js_fns::HTMLElement>(el)
   };
 
+  // TODO use a macro to do this
+
+  // CLICK
   let on_click_cb = Closure::new(|e: MouseEvent| {
-    let event = unsafe {
-      transmute::<MouseEvent, Event>(e)
-    };
+    js_fns::log("on click");
+    let event: Event = e.into();
     if let Some(t) = event.target() {
       let target_html_el: HtmlElement = unsafe {
         transmute::<EventTarget, HtmlElement>(t)
@@ -75,33 +91,26 @@ fn attach_listeners(el: &Element) {
         let path = get_path_from(root_element, &target_html_el);
 
         let diff_opt = ROOT_COMPONENT.with_inner_value(|root_component| {
-          let should_rerender = {
+          {
             let mut top_level_token: HtmlToken = root_component.render(());
-            match find_token_by_path(&mut top_level_token, &path) {
-              Some(target_token) => {
-                if let HtmlToken::DomElement(d) = target_token {
-                  if let Some(ref mut on_click) = d.event_handlers.on_click {
-                    let mouse_event = unsafe {
-                      transmute::<&Event, &MouseEvent>(&event)
-                    };
-                    on_click(&mouse_event);
-                    true
-                  } else { false }
-                } else { false }
-              },
-              None => { false },
-            }
-          };
-          if should_rerender {
-            // we've updated things due to the call to on_click!
-            let new_token = root_component.render(()).as_bare_token();
-            let diff = LAST_RENDERED_TOKEN.with_inner_value(|old_token| {
-              let diff = new_token.get_diff_with(old_token);
-              diff
-            });
-            LAST_RENDERED_TOKEN.store(new_token);
-            Some(diff)
-          } else { None }
+            js_fns::log(&format!("1 path - {:?}", path));
+            find_token_by_path(&mut top_level_token, &path).and_then(|target_token| {
+              js_fns::log(&format!("2 and then {:?}", target_token.as_inner_html()));
+              if let HtmlToken::DomElement(d) = target_token {
+                if let Some(ref mut on_click) = d.event_handlers.on_click {
+                  let mouse_event = unsafe {
+                    transmute::<&Event, &MouseEvent>(&event)
+                  };
+                  js_fns::log("executing on click");
+                  on_click(&mouse_event);
+                  Some(())
+                } else { None }
+              } else { None }
+            })
+          }
+            .map(|_| {
+              get_diff(root_component)
+            })
         });
 
         if let Some(diff) = diff_opt {
@@ -112,6 +121,84 @@ fn attach_listeners(el: &Element) {
   });
   html_el.set_onclick(&on_click_cb);
   on_click_cb.forget();
+
+  // KEYDOWN
+  let on_keydown_cb = Closure::new(|e: KeyboardEvent| {
+    let event: Event = e.into();
+    if let Some(t) = event.target() {
+      let target_html_el: HtmlElement = unsafe {
+        transmute::<EventTarget, HtmlElement>(t)
+      };
+      ROOT_ELEMENT.with_inner_value(|root_element| {
+        let path = get_path_from(root_element, &target_html_el);
+
+        let diff_opt = ROOT_COMPONENT.with_inner_value(|root_component| {
+          {
+            let mut top_level_token: HtmlToken = root_component.render(());
+            find_token_by_path(&mut top_level_token, &path).and_then(|target_token| {
+              if let HtmlToken::DomElement(d) = target_token {
+                if let Some(ref mut on_keydown) = d.event_handlers.on_keydown {
+                  let keyboard_event = unsafe {
+                    transmute::<&Event, &KeyboardEvent>(&event)
+                  };
+                  on_keydown(&keyboard_event);
+                  Some(())
+                } else { None }
+              } else { None }
+            })
+          }
+            .map(|_| {
+              get_diff(root_component)
+            })
+        });
+
+        if let Some(diff) = diff_opt {
+          apply_diff(root_element, diff);
+        }
+      });
+    }
+  });
+  html_el.set_onkeydown(&on_keydown_cb);
+  on_keydown_cb.forget();
+
+  // INPUT
+  let on_input_cb = Closure::new(|e: InputEvent| {
+    let event: Event = e.into();
+    if let Some(t) = event.target() {
+      let target_html_el: HtmlElement = unsafe {
+        transmute::<EventTarget, HtmlElement>(t)
+      };
+      ROOT_ELEMENT.with_inner_value(|root_element| {
+        let path = get_path_from(root_element, &target_html_el);
+
+        let diff_opt = ROOT_COMPONENT.with_inner_value(|root_component| {
+          {
+            let mut top_level_token: HtmlToken = root_component.render(());
+            find_token_by_path(&mut top_level_token, &path).and_then(|target_token| {
+              if let HtmlToken::DomElement(d) = target_token {
+                if let Some(ref mut on_input) = d.event_handlers.on_input {
+                  let input_event = unsafe {
+                    transmute::<&Event, &InputEvent>(&event)
+                  };
+                  on_input(&input_event);
+                  Some(())
+                } else { None }
+              } else { None }
+            })
+          }
+            .map(|_| {
+              get_diff(root_component)
+            })
+        });
+
+        if let Some(diff) = diff_opt {
+          apply_diff(root_element, diff);
+        }
+      });
+    }
+  });
+  html_el.set_oninput(&on_input_cb);
+  on_input_cb.forget();
 }
 
 pub fn mount(div_id: &str, component: ComponentAlt) {

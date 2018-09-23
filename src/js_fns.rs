@@ -1,7 +1,7 @@
 extern crate wasm_bindgen;
 use wasm_bindgen::prelude::*;
 
-use web_sys::MouseEvent;
+use web_sys::{MouseEvent, KeyboardEvent, InputEvent};
 
 #[wasm_bindgen]
 extern {
@@ -20,4 +20,8 @@ extern {
   pub type HTMLElement;
   #[wasm_bindgen(method, setter)]
   pub fn set_onclick(this: &HTMLElement, cb: &Closure<FnMut(MouseEvent)>);
+  #[wasm_bindgen(method, setter)]
+  pub fn set_onkeydown(this: &HTMLElement, cb: &Closure<FnMut(KeyboardEvent)>);
+  #[wasm_bindgen(method, setter)]
+  pub fn set_oninput(this: &HTMLElement, cb: &Closure<FnMut(InputEvent)>);
 }
