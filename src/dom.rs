@@ -1,5 +1,4 @@
 use jsx_types::{*, diff};
-// use super::js_fns;
 
 use std::mem::transmute;
 use web_sys::{
@@ -8,6 +7,7 @@ use web_sys::{
   Window,
   HtmlElement,
   HtmlTemplateElement,
+  HtmlInputElement,
   Node,
   DocumentFragment,
 };
@@ -131,7 +131,15 @@ pub fn apply_diff(root_el: &HtmlElement, diff: diff::Diff) {
           transmute::<Node, Element>(node)
         };
         for (attribute, value) in update_attributes_operation.new_attributes {
-          let _ = element.set_attribute(&attribute, &value);
+          // N.B. this is not good! There should be no special handling here.
+          if attribute != "value" {
+            let _ = element.set_attribute(&attribute, &value);
+          } else {
+            let input_element = unsafe {
+              transmute::<&Element, &HtmlInputElement>(&element)
+            };
+            input_element.set_value(&value);
+          }
         }
       },
     };
